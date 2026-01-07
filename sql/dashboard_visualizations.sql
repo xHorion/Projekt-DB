@@ -23,7 +23,7 @@ JOIN DIM_LOCATION l ON f.dim_location_key = l.location_key
 JOIN DIM_DATE d ON f.dim_date_key = d.date_key
 JOIN DIM_WEATHER_TYPE wt ON f.dim_weather_type_key_midday = wt.weather_type_key
 JOIN DIM_WIND_TYPE wd ON f.dim_wind_type_key_midday = wd.wind_type_key
-WHERE wt.weather_description LIKE '%Clear%' OR wt.weather_description LIKE '%Partly Cloudy%'
+WHERE (wt.weather_description LIKE '%Clear%' OR wt.weather_description LIKE '%Partly Cloudy%')
   AND wd.wind_speed_category = 'Light'
   AND f.visibility_midday > 10000
 ORDER BY d.date;;

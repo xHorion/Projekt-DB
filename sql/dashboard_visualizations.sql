@@ -13,14 +13,20 @@ ORDER BY forecast_lead_time_hours DESC;
 -- Graf 2 Dates For Outdoor Work
 
 SELECT 
-    l.postcode,
-    f.forecast_issued_at,
+    l.postcode, 
     d.date,
-    DATEDIFF('hour', f.forecast_issued_at, d.date) as forecast_lead_time_hours
+    f.avg_temperature_day,
+    wd.wind_speed_category,
+    wt.weather_description
 FROM FACT_WEATHER_FORECAST f
 JOIN DIM_LOCATION l ON f.dim_location_key = l.location_key
 JOIN DIM_DATE d ON f.dim_date_key = d.date_key
-ORDER BY forecast_lead_time_hours DESC;
+JOIN DIM_WEATHER_TYPE wt ON f.dim_weather_type_key_midday = wt.weather_type_key
+JOIN DIM_WIND_TYPE wd ON f.dim_wind_type_key_midday = wd.wind_type_key
+WHERE wt.weather_description LIKE '%Clear%' OR wt.weather_description LIKE '%Partly Cloudy%'
+  AND wd.wind_speed_category = 'Light'
+  AND f.visibility_midday > 10000
+ORDER BY d.date;;
 
 -- Graf 3 Posible Weather Volatility in Regions
 

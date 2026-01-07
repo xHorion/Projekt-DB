@@ -39,7 +39,7 @@ Zdrojom dátového súboru je [Snowflake Marketplace](https://app.snowflake.com/
 * `free_view_hourly` - Meteorologické údaje za hodinu
 * `free_view_three_hourly` - Meteorologické údaje za tri hodiny
 
-Všetky tieto tabuľky sú navzájom prepojené. Každá tabuľka zobrazuje rovnaké údaje, avšak za rôzne časové obdobia. V našom projekte používame práve tabuľku `free_view_daily` a `free_view_hourly. V podstate používame tabuľku „free_view_daily“, pretože práve meteorologické údaje za celý deň sú vhodnejšie na porovnávanie, efektívne sa ukladajú a ideálne sa hodia pre obchodné cykly (logistika, plánovanie objednávok alebo zmien práce) a mnoho ďalších vecí. Tabuľku „free_view_hourly“ používame len na výpočet priemernej dennej teploty.
+Všetky tieto tabuľky sú navzájom prepojené. Každá tabuľka zobrazuje rovnaké údaje, avšak za rôzne časové obdobia. V našom projekte používame práve tabuľku `free_view_daily` a `free_view_hourly`. V podstate používame tabuľku `free_view_daily`, pretože práve meteorologické údaje za celý deň sú vhodnejšie na porovnávanie, efektívne sa ukladajú a ideálne sa hodia pre obchodné cykly (logistika, plánovanie objednávok alebo zmien práce) a mnoho ďalších vecí. Tabuľku `free_view_hourly` používame len na výpočet priemernej dennej teploty.
 
 Cieľom procesu ELT bolo pripraviť, transformovať a sprístupniť tieto údaje na účely multidimenzionálnej analýzy.
 
@@ -82,8 +82,10 @@ Používame Star Schema podľa Kimballovej metodológie, ktorá obsahuje 1 tabu�
 * **Cudzie kľúče (FK)**:
   * `dim_date_key`
   * `dim_location_key`
-  * `dim_weather_type_key`
-  * `dim_wind` 
+  * `dim_weather_type_key_midday`
+  * `dim_weather_type_key_midnight`
+  * `dim_wind_type_key_midday`
+  * `dim_wind_type_key_midnight` 
 * **Hlavné metriky**:
   * `max_temperature_day` / `max_temperature_night` - denné a nočné maximá.
   * `avg_temperature` — priemerná denná teplota.
@@ -92,7 +94,6 @@ Používame Star Schema podľa Kimballovej metodológie, ktorá obsahuje 1 tabu�
   * `visibility_midday` / `visibility_midnight` — viditeľnosť na poludnie a o polnoci (dôležité pre dopravu).
   * `wind_speed_midday` / `wind_speed_midnight` — rýchlosť vetra v kľúčových časoch dňa.
   * `wind_direction_midday` / `wind_direction_midnight` — smer vetra.
-  * `wind_speed_category` — kategorizácia sily vetra na základe rýchlosti.
 
 ### 2.2 Tabuľky dimenzií
 
@@ -111,8 +112,8 @@ Používame Star Schema podľa Kimballovej metodológie, ktorá obsahuje 1 tabu�
 * **Vzťah k faktom**: 1:N
 * **Typ SCD**: Typ 0
 
-**dim_wind** 
-* **Obsah**: obsahuje úplné informácie o vetre (jeho rýchlosť, smer).
+**dim_wind_type** 
+* **Obsah**: obsahuje úplné informácie o vetre (jeho rýchlosť, popis smeru).
 * **Vzťah k faktom**: 1:N
 * **Typ SCD**: Typ 0
 
@@ -179,7 +180,7 @@ SELECT
 FROM POSTCODE_SECTOR_WEATHER_FORECASTS__SAMPLE.PCSECT_FORECAST."free_view_daily";
 ```
 
-Cesta je tu presne taká istá, ale tabuľka je už iná. V našom prípade je to teraz `„free_view_daily”`. Práve s touto tabuľkou budeme ďalej pracovať. Práve ona obsahuje „surové” údaje, ktoré potrebujeme.
+Cesta je tu presne taká istá, ale tabuľka je už iná. V našom prípade je to teraz `free_view_daily`. Práve s touto tabuľkou budeme ďalej pracovať. Práve ona obsahuje „surové” údaje, ktoré potrebujeme.
 
 Ďalej vytvoríme prázdne tabuľky dimenzií, do ktorých budeme v budúcnosti vkladať už pripravené údaje.
 
@@ -266,7 +267,7 @@ CREATE OR REPLACE TABLE FACT_WEATHER_FORECAST (
 
 ### Funckie
 
-V našom projekte vytvárame funkcie samostatne, namiesto toho, aby sme ich robili priamo v tabuľkách. Robíme to preto, aby sme v budúcnosti nemuseli do každej tabuľky zapisovať obrovské množstvo textu, čím ušetríme čas a zmenšíme veľkosť nášho kódu. Pri akýchkoľvek zmenách v obchodnej logike (napr. kategória „Strong“ sa zmení z 29 na 30) bude stačiť zmeniť len niekoľko znakov v jednej funkcii. Je to oveľa jednoduchšie a rýchlejšie, ako to meniť v každej tabuľke, kde to používame.
+V našom projekte vytvárame funkcie samostatne, namiesto toho, aby sme ich robili priamo v tabuľkách. Robíme to preto, aby sme v budúcnosti nemuseli do každej tabuľky zapisovať obrovské množstvo textu, čím ušetríme čas a zmenšíme veľkosť nášho kódu. Pri akýchkoľvek zmenách v obchodnej logike (napr. kategória `Strong` sa zmení z 29 na 30) bude stačiť zmeniť len niekoľko znakov v jednej funkcii. Je to oveľa jednoduchšie a rýchlejšie, ako to meniť v každej tabuľke, kde to používame.
 Funkcie sú uvedené nižšie:
 
 `get_wind_direction` - funkcia, ktora funguje ako digitálny kompas. Prijíma azimut v stupňoch (od 0 do 360) a vráti skrátený názov svetovej strany. Rozdelí kruh na 8 sektorov po 45 stupňoch a pomocou CASE priradí konkrétny názov v tabuľke.
@@ -526,7 +527,7 @@ JOIN DIM_LOCATION l ON f.dim_location_key = l.location_key
 JOIN DIM_DATE d ON f.dim_date_key = d.date_key
 JOIN DIM_WEATHER_TYPE wt ON f.dim_weather_type_key_midday = wt.weather_type_key
 JOIN DIM_WIND_TYPE wd ON f.dim_wind_type_key_midday = wd.wind_type_key
-WHERE wt.weather_description LIKE '%Clear%' OR wt.weather_description LIKE '%Partly Cloudy%'
+WHERE (wt.weather_description LIKE '%Clear%' OR wt.weather_description LIKE '%Partly Cloudy%')
   AND wd.wind_speed_category = 'Light'
   AND f.visibility_midday > 10000
 ORDER BY d.date;
